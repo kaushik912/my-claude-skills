@@ -67,6 +67,8 @@ Wherever a task changes behavior (as opposed to pure config/scaffolding), order 
 
 If `plan.md` has a `## API docs` section recording a tool, add a wiring task (dependency + config) plus a test-first pair asserting the docs UI/spec endpoints are reachable (e.g. 200/3xx on `/swagger-ui.html` and `/v3/api-docs`), placed after the CRUD/behavior tasks it documents.
 
+Always add a final non-test-first task: write a `Makefile` with a `test` target (or, if the stack has no Makefile convention, a `README.md` "Running tests" section) containing the literal, copy-pasteable command from `plan.md`'s `## Testing seam` tooling — e.g. `python3 -m unittest discover -s tests -v`, not just "run the unittest suite". This is the durable, on-disk record of how to verify the feature — don't rely on having said the command in chat.
+
 Get explicit approval on the task list, flip to `approved`, then start Implement immediately on the first unchecked task.
 
 ## Stage: Implement
@@ -75,4 +77,4 @@ One task at a time, top to bottom. For any task with a paired failing-test task,
 
 After a task passes, check its box in `tasks.md` immediately — don't batch checkbox updates, since a drop-off mid-batch is exactly what the resume logic needs to survive. Do not commit automatically; suggest a commit per completed task and let the user decide.
 
-When the last box is checked, tell the user the feature is complete.
+When the last box is checked, tell the user the feature is complete and point them at the Makefile/README test instructions from the last task, quoting the literal command.

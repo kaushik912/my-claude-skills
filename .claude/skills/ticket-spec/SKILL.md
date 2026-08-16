@@ -12,6 +12,8 @@ Preferred launch is from the shell, one command per ticket: `claude -w <slug>` (
 
 Invoked with a path to a ticket YAML, e.g. `/ticket-spec tickets/TICKET-001.yaml`. No path given -> look for exactly one `*.yaml` under `./tickets/`; several -> ask which.
 
+**Given freeform text instead of a path** (e.g. `/ticket-spec build me a thing that does X, Y, Z`), and no unambiguous ticket YAML resolves per the rule above: this is a new ticket, not yet written — do not silently author one from assumptions. Interview the user first, same rigor as `spec`'s Spec stage (problem, goal, non-goals, acceptance criteria, pushing on ambiguity until each criterion is testable), plus the ticket-specific fields below that a real ticket author would otherwise have pinned down: stack choice (if the repo doesn't already dictate one), `testing_seam`, `api_docs`, and whether to run unattended (`auto_approve`). Only write `tickets/<slug>.yaml` once the user has confirmed those answers — then proceed to Bootstrap as normal. Skip the interview only when the freeform text already answers all of the above unambiguously (rare) or when a matching ticket YAML already exists.
+
 Ticket schema:
 
 ```yaml
@@ -31,6 +33,8 @@ testing_seam: single      # layered | single — skips the interactive ask in Pl
 api_docs: false           # true|false — skips the interactive ask in Plan
 auto_approve: true        # true = flip status:approved at every gate, unattended
 ```
+
+When authoring the ticket yourself from an interview (see freeform-input case above), default `auto_approve` to `false` unless the user explicitly asks for an unattended run — `true` is an opt-in for the parallel-worktree use case, not a default to assume on someone's behalf.
 
 `slug` is mandatory and does double duty: `.spec/<slug>/` dir name and the worktree/branch name. Pick it from the feature itself (what the ticket does), not the ticket id — e.g. `likes`, `search-filter`, `csv-export`. If a ticket omits it, derive one by slugifying `title` (lowercase, spaces/punctuation -> `-`) and write it back into the ticket file rather than inventing something unrelated to the feature. Must satisfy `EnterWorktree`'s `name` constraint: letters, digits, dots, underscores, dashes only.
 
@@ -63,7 +67,7 @@ Unlike `spec` (which leaves commits to the user), always commit after each task 
 
 ## Stage: Wrap-up
 
-When `tasks.md` is all `[x]`, tell the user the feature is complete, report the worktree path and branch name, and call `ExitWorktree(action: "keep")` — never `"remove"`, since the point is to hand back a reviewable branch. Do not exit the worktree before then, and do not exit it on a mid-run failure either (leave it for the user to inspect/resume).
+When `tasks.md` is all `[x]`, tell the user the feature is complete, report the worktree path and branch name, and quote the literal verify command from the Makefile/README written in the last task (per `spec`'s Tasks stage). Then call `ExitWorktree(action: "keep")` — never `"remove"`, since the point is to hand back a reviewable branch. Do not exit the worktree before then, and do not exit it on a mid-run failure either (leave it for the user to inspect/resume).
 
 ## Parallel worktree usage
 
