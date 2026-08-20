@@ -9,6 +9,8 @@ subagent_type: general-purpose
 
 Generate `spring init` commands for various project types, Java versions, Boot versions, and dependency combinations. Each invocation produces a shell-ready command that can be copy-pasted or executed directly.
 
+> Tip: run `spring help` to see all available Spring CLI commands; `spring help init` shows flags/options for `init` specifically.
+
 ## Steps
 
 ### 1. Parse requirements
