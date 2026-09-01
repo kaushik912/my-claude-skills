@@ -4,6 +4,11 @@ When you finish fixing an API-related bug (any project, any language), remind th
 user to add a Bruno regression test under `/regressions` — unless one already exists.
 No file-type restriction: this is a judgment call about the change, not the file touched.
 
+For proactively discovering test scenarios that aren't tied to a specific bug
+(and as a learning guide to how the API is supposed to behave), see the
+`api-grill` skill — its output at `docs/api-scenarios.md` is a good place to
+check before drafting a new regression test here.
+
 - **Counts as an API bug fix**: request/response handling, status codes, validation,
   auth/authz, endpoint business logic, error mapping, or contract issues (path/query
   params, schema) — where a client would now observe corrected behavior.
@@ -23,6 +28,16 @@ decline, drop it for this fix.
 
 **Naming**: `regressions/BUG-<id-or-date>-<slug>.bru`, e.g.
 `regressions/BUG-JIRA-123-null-email-500.bru`.
+
+**Scenario**: every `.bru` test must include a `docs {}` block with a short,
+plain-English scenario — what was broken, what request triggers it, what the
+correct behavior now is. Plain English only, no jargon/code. E.g.:
+```
+docs {
+  Scenario: user signs up with an email already in use.
+  Before fix: server 500'd. Now: 409 with a clear "email taken" message.
+}
+```
 
 **Syntax**: use the `bruno` skill (`my-claude-skills:bruno`) for `.bru` format.
 
