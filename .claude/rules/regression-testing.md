@@ -4,10 +4,10 @@ When you finish fixing an API-related bug (any project, any language), remind th
 user to add a Bruno regression test under `/regressions` — unless one already exists.
 No file-type restriction: this is a judgment call about the change, not the file touched.
 
-For proactively discovering test scenarios that aren't tied to a specific bug
-(and as a learning guide to how the API is supposed to behave), see the
-`api-grill` skill — its output at `docs/api-scenarios.md` is a good place to
-check before drafting a new regression test here.
+For proactively discovering test scenarios that aren't tied to a specific bug (and
+as a learning guide to how the API is supposed to behave), use the
+`api-regression-guard` skill's Phase 1 — its output at `docs/api-scenarios.md` is a
+good place to check before drafting a new regression test here.
 
 - **Counts as an API bug fix**: request/response handling, status codes, validation,
   auth/authz, endpoint business logic, error mapping, or contract issues (path/query
@@ -17,72 +17,25 @@ check before drafting a new regression test here.
 - If unsure: "would a client calling this endpoint see different behavior now?" → yes
   means it applies.
 
-**Before proposing a new test**: check `/regressions` (project or module root) for an
-existing `.bru` covering this bug — grep filenames/`meta{}`/`tests{}` for the endpoint,
-method, or error condition. Reuse/extend it instead of duplicating.
+**Drafting the test**: invoke the `api-regression-guard` skill's Phase 2 to do the
+actual work — finding/scaffolding the `/regressions` collection, deduping against
+existing tests, confirming content before writing. Override the skill's defaults
+with these bug-fix-specific conventions instead:
 
-**If no match exists**: draft the `.bru` content and ask the user before creating
-anything — never write it silently. If they agree, create `/regressions` (plus
-`bruno.json` and `environments/local.bru` below, if new) and the test file. If they
-decline, drop it for this fix.
+- **Naming**: `regressions/BUG-<id-or-date>-<slug>.bru` (not the skill's default
+  `<slug>.bru`), e.g. `regressions/BUG-JIRA-123-null-email-500.bru`.
+- **`docs {}` format**: `Scenario` / `Before fix` / `Now` (not the skill's default
+  `Scenario` / `Expected`) — plain English, no jargon/code:
+  ```
+  docs {
+    Scenario: user signs up with an email already in use.
+    Before fix: server 500'd. Now: 409 with a clear "email taken" message.
+  }
+  ```
 
-**Naming**: `regressions/BUG-<id-or-date>-<slug>.bru`, e.g.
-`regressions/BUG-JIRA-123-null-email-500.bru`.
+If the user declines the test, drop it for this fix — don't create anything.
 
-**Scenario**: every `.bru` test must include a `docs {}` block with a short,
-plain-English scenario — what was broken, what request triggers it, what the
-correct behavior now is. Plain English only, no jargon/code. E.g.:
-```
-docs {
-  Scenario: user signs up with an email already in use.
-  Before fix: server 500'd. Now: 409 with a clear "email taken" message.
-}
-```
-
-**Syntax**: use the `bruno` skill (`my-claude-skills:bruno`) for `.bru` format.
-
-## Collection layout
-
-```
-regressions/
-├── bruno.json
-├── environments/
-│   └── local.bru
-└── BUG-<id-or-date>-<slug>.bru ...
-```
-
-`bruno.json`:
-```json
-{ "version": "1", "name": "regressions", "type": "collection" }
-```
-
-`environments/local.bru` (check `server.port`/config for the real local port before
-defaulting to 8080 — a wrong port fails tests with "connection refused," not a real
-signal about the bug):
-```
-vars {
-  baseUrl: http://localhost:8080
-}
-```
-
-## On-demand run target
-
-Once `/regressions` exists, add a `Makefile` target so the collection can be run
-on demand, locally, against a running local instance — unless the project already
-has one. Confirm with the user before creating/editing the `Makefile`. Framework-
-agnostic (Spring, Node, Python, Go, ...) — no build-tool-specific wiring, no CI
-requirement.
-
-Uses `npx --yes @usebruno/cli` rather than a global `bru` install, so no dev/CI
-machine needs a standing global npm package.
-
-```makefile
-.PHONY: regressions
-regressions:
-	npx --yes @usebruno/cli run regressions/ --env local --recursive \
-		--output regressions-results.xml --format junit
-```
-
-Local usage: `make regressions` (app must already be running locally). Pin
-`@usebruno/cli` to a specific version once the team settles on one, to avoid `npx`
-drifting on "latest."
+Everything else (collection layout, `bruno.json`/`environments/local.bru`
+scaffolding, dedup check, confirm-before-write, the `make regressions` target) is
+handled identically to `api-regression-guard`'s Phase 2/3 — no separate convention
+to maintain here.

@@ -1,9 +1,9 @@
 # Scenario Checklist
 
-Categories to check per endpoint when building candidate scenarios. Not every
-category applies to every endpoint — skip what doesn't fit.
+Angles to consider per endpoint when building candidate scenarios in
+Phase 1. Not every angle applies to every endpoint — skip what doesn't fit.
 
-| Category | What to look for | Example question |
+| Angle | What to look for | Example question |
 |---|---|---|
 | Validation | required/optional fields, type/format/range constraints | What happens with a missing, blank, or wrong-type field? |
 | Auth/authz | missing token, wrong role, expired credential | What happens with no token? With the wrong role? |
