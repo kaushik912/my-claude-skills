@@ -4,8 +4,8 @@ Personal collection of coding-agent skills.
 
 ## Layout
 
-- `.claude/skills/` — Claude Code specific (uses Claude-only tools/conventions, e.g. `EnterWorktree`, slash commands).
-- `.agents/skills/` — agent agnostic (plain git/shell only; works with Claude Code, GitHub Copilot CLI, or any coding agent).
+- `.agents/skills/` — canonical content. Agent-agnostic skills live here directly; Claude-specific skills that have an agnostic fork also live here (e.g. `ticket-spec-agnostic`).
+- `.claude/skills/` — Claude Code's view. Agent-agnostic skills are symlinks into `.agents/skills/<name>` (single source of truth, edit once). Skills that genuinely need Claude-only tools/conventions (e.g. `EnterWorktree`, slash-skill refs) live here as real files instead — `spec` and `ticket-spec` are the current examples.
 
 ## Installing into another project
 
