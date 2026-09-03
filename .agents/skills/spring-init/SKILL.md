@@ -2,7 +2,6 @@
 name: spring-init
 description: Generate and validate Spring Boot project initialization commands with configurable dependencies
 invocation: explicit
-subagent_type: general-purpose
 ---
 
 # Spring Boot Project Initializer
