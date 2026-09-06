@@ -1,0 +1,8 @@
+# Copy to ./db.cnf (project root), fill in real values, then:
+#   chmod 600 db.cnf
+#   echo "db.cnf" >> .gitignore
+[client]
+user=yourusername
+password=yourpassword
+host=localhost
+database=yourdb

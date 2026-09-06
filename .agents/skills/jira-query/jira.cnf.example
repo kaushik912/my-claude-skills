@@ -1,0 +1,12 @@
+# Copy to ./jira.cnf (project root), fill in real values, then:
+#   chmod 600 jira.cnf
+#   echo "jira.cnf" >> .gitignore
+#
+# Token: https://id.atlassian.com/manage-profile/security/api-tokens
+#
+# jira.cnf is bash-sourced (not a plain ini file), so JIRA_TOKEN can
+# reference an env var instead of a raw literal — export the real token
+# in ~/.bashrc as JIRA_API_TOKEN and leave the line below as-is.
+JIRA_SITE="yoursite.atlassian.net"
+JIRA_EMAIL="you@company.com"
+JIRA_TOKEN="${JIRA_API_TOKEN}"
