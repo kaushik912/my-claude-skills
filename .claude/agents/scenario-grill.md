@@ -1,5 +1,5 @@
 ---
-name: scenario-checklist
+name: scenario-grill
 description: Brainstorms API test scenarios for a repo interactively (category by category, happy path first, then top edge cases) and implements a confirmed one as a Bruno or RestAssured test
 tools: Read, Grep, Glob, Bash, Write
 memory: project
