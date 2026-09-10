@@ -7,7 +7,7 @@ touched.
 
 For proactively discovering test scenarios that aren't tied to a specific bug
 (and as a learning guide to how the API is supposed to behave), use the
-`scenario-grill` agent instead — it's a broader, exploratory workflow with
+`scenario-griller` agent instead — it's a broader, exploratory workflow with
 its own `docs/api-scenarios.md` tracking, not part of this rule.
 
 - **Counts as an API bug fix**: request/response handling, status codes, validation,

@@ -1,8 +1,18 @@
 ---
-name: scenario-grill
-description: Brainstorms API test scenarios for a repo interactively (category by category, happy path first, then top edge cases) and implements a confirmed one as a Bruno or RestAssured test
-tools: Read, Grep, Glob, Bash, Write
-memory: project
+name: scenario-grill-me
+description: >-
+  Brainstorms API test scenarios for a repo interactively (category by
+  category, happy path first, then top edge cases) and implements a
+  confirmed one as a Bruno or RestAssured test. Use when the user wants to
+  explore/discover API test scenarios proactively, do a "scenario grill",
+  or find edge cases worth testing — not tied to a specific bug fix.
+license: MIT
+compatibility: "Requires Read/Grep/Glob/Bash/Write-equivalent tool access"
+metadata:
+  author: kaushik912
+  version: "1.0.0"
+  category: development
+  tags: ["api-testing", "bruno", "restassured", "test-scenarios", "regression"]
 ---
 
 Take a repo from "no scenario coverage" to a documented, reviewable regression
