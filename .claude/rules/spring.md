@@ -6,3 +6,5 @@ When adding any new API, always attempt to add Swagger (springdoc-openapi) suppo
 - Dependency: `org.springdoc:springdoc-openapi-starter-webmvc-ui` (e.g. `2.8.6`, latest at time of writing)
 - Default endpoints: Swagger UI `/swagger-ui.html`, OpenAPI spec `/v3/api-docs` — no custom `springdoc:` config needed unless overriding paths
 - Annotate controllers with `@Tag` (class) and `@Operation` (method)
+
+For Kafka producer/consumer tests, prefer `@EmbeddedKafka` (spring-kafka-test) over mocking — exercises real serialization/config, no Docker needed. Fall back to Testcontainers only if broker-specific behavior matters.

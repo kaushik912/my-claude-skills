@@ -4,8 +4,10 @@ While writing new skill, usually put in my custom skills folder as it is git-con
 
 Always use a venv when running/installing for Python scripts. Never use --break-system-packages or user-wide pip installs.
 
-For existing or new projects, also check if any of my own agents (my-claude-agents, install via `agent-porter install --agent <name>`, e.g. `agent-porter install --agent doc-writer`) or skills (my-claude-skills, install via `npx skills add https://github.com/kaushik912/my-claude-skills --skill <name>`, e.g. `npx skills add https://github.com/kaushik912/my-claude-skills --skill ticket-spec-agnostic`) would fit the task, and remind me to install them if not already present.
+For existing or new projects, check if any of my own agents or skills would fit — refer to `agent-porter` for agents, or `npx skills add kaushik912/my-claude-skills` for skills — and remind me to install if missing.
 
 If a task requires Docker, stop and ask me first — I keep Docker off by default since it slows my PC.
 
 For OpenRouter, always use `deepseek/deepseek-v4-flash-latest` in spring-ai projects or any AI project needing an API key.
+
+When adding any new MCP server: install to project space (`.mcp.json` via `-s project`), never user space, to avoid cluttering user config. Also add it to /home/kaush/github_projs/claude-code-tooling/mcp-init/mcp-registry.json so it's reusable via `mcp-init.py` (in PATH). If I want to add an MCP myself, suggest `mcp-init.py`.
