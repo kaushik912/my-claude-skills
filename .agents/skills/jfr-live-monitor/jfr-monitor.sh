@@ -9,8 +9,9 @@ WINDOW="${3:-60}"
 
 usage() {
     echo "Usage: $0 <pid> [interval_seconds=30] [window_seconds=60]" >&2
-    echo "  env overrides: JFR_VIEWS (comma-separated), JFR_MAXSIZE," >&2
-    echo "                 HEAP_DUMP_ON_OOM (default false), HEAP_DUMP_PATH" >&2
+    echo "  env overrides: JFR_VIEWS (comma-separated), JFR_MAXSIZE" >&2
+    echo "  companion: heap-dump-on-oom.sh in this same directory catches an" >&2
+    echo "  actual OutOfMemoryError — jfr view can't (see SKILL.md)." >&2
     exit 1
 }
 
@@ -63,57 +64,19 @@ echo "Loaded JDK via SDKMAN (.sdkmanrc): $JFR_BIN"
 
 JFR_VIEWS="${JFR_VIEWS:-hot-methods,gc}"
 JFR_MAXSIZE="${JFR_MAXSIZE:-200m}"
-HEAP_DUMP_ON_OOM="${HEAP_DUMP_ON_OOM:-false}"
 RECORDING_NAME="jfr-live-monitor"
 DUMP_FILE="$(mktemp -t jfr-live-monitor-XXXXXX.jfr)"
 STARTED_RECORDING=0
-STARTED_HEAP_DUMP_FLAG=0
-HEAP_DUMP_PATH=""
-HEAP_DUMP_ANNOUNCED=0
 
 # Registered immediately after DUMP_FILE exists so every exit path from here
-# on (including the validation checks right below) cleans it up. Reverts
-# HeapDumpOnOutOfMemoryError too, but only if this run turned it on itself —
-# never touches a setting the target JVM already had.
+# on (including the validation checks right below) cleans it up.
 cleanup() {
     if [ "$STARTED_RECORDING" -eq 1 ]; then
         "$JCMD_BIN" "$PID" JFR.stop name="$RECORDING_NAME" >/dev/null 2>&1 || true
     fi
-    if [ "$STARTED_HEAP_DUMP_FLAG" -eq 1 ]; then
-        "$JCMD_BIN" "$PID" VM.set_flag HeapDumpOnOutOfMemoryError false >/dev/null 2>&1 || true
-    fi
     rm -f "$DUMP_FILE"
 }
 trap cleanup EXIT INT TERM
-
-# jdk.JavaErrorThrow explicitly ignores OutOfMemoryError (per the JDK's own
-# event metadata) — jfr view/print never sees it. HeapDumpOnOutOfMemoryError
-# is the reliable way to catch it, and it's a {manageable} flag, so it can be
-# toggled on a JVM that's already running, no restart needed. Opt-in
-# (default false): a heap dump is roughly the size of -Xmx (we've seen
-# 100MB-heap -> 117MB dump, ~1.9GB-heap -> 2.75GB dump), and if $TMPDIR is
-# tmpfs (common in containers) that write competes with the app for the same
-# RAM right when it's already under pressure — the wrong default for a
-# monitoring tool to impose silently on a prod box. Skip entirely if the
-# target already has it configured — don't clobber someone else's path.
-if [ "$HEAP_DUMP_ON_OOM" = "true" ]; then
-    VM_FLAGS_OUTPUT="$("$JCMD_BIN" "$PID" VM.flags -all 2>&1 || true)"
-    CURRENT_HDOOME="$(printf '%s' "$VM_FLAGS_OUTPUT" | grep -oE 'HeapDumpOnOutOfMemoryError *= *(true|false)' | grep -oE 'true|false' || true)"
-    if [ "$CURRENT_HDOOME" = "true" ]; then
-        HEAP_DUMP_PATH="$(printf '%s' "$VM_FLAGS_OUTPUT" | grep -oE 'HeapDumpPath *= *[^ ]*' | sed 's/.*= *//' || true)"
-        echo "HeapDumpOnOutOfMemoryError already enabled on pid $PID (path: ${HEAP_DUMP_PATH:-JVM default}) — leaving as-is."
-    else
-        HEAP_DUMP_PATH="${HEAP_DUMP_PATH:-${TMPDIR:-/tmp}/jfr-live-monitor-heap-${PID}-$(date +%s).hprof}"
-        if "$JCMD_BIN" "$PID" VM.set_flag HeapDumpOnOutOfMemoryError true >/dev/null 2>&1 \
-           && "$JCMD_BIN" "$PID" VM.set_flag HeapDumpPath "$HEAP_DUMP_PATH" >/dev/null 2>&1; then
-            STARTED_HEAP_DUMP_FLAG=1
-            echo "Enabled HeapDumpOnOutOfMemoryError on pid $PID -> $HEAP_DUMP_PATH (flag reverted on exit, dump file itself is kept)."
-        else
-            echo "WARNING: couldn't enable HeapDumpOnOutOfMemoryError on pid $PID (non-fatal, continuing without it)." >&2
-            HEAP_DUMP_PATH=""
-        fi
-    fi
-fi
 
 JFR_VIEW_HELP="$("$JFR_BIN" view 2>&1 || true)"
 if printf '%s' "$JFR_VIEW_HELP" | grep -qi "unknown command"; then
@@ -147,11 +110,6 @@ while true; do
     if ! kill -0 "$PID" 2>/dev/null; then
         echo "Process $PID is gone, stopping."
         break
-    fi
-
-    if [ -n "$HEAP_DUMP_PATH" ] && [ "$HEAP_DUMP_ANNOUNCED" -eq 0 ] && [ -f "$HEAP_DUMP_PATH" ]; then
-        echo "!!! Heap dump captured — an OutOfMemoryError occurred: $HEAP_DUMP_PATH !!!"
-        HEAP_DUMP_ANNOUNCED=1
     fi
 
     # jcmd can exit 0 even when the underlying JFR.dump semantically failed

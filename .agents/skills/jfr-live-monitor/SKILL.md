@@ -6,7 +6,9 @@ description: >-
   process CPU-bound right now", "poll the JVM every 30s", "live monitor this
   pid", "keep an eye on GC while load is running". Polls a rolling JFR
   recording on the target pid via jcmd + jfr view — no APM agent, no restart
-  of the target JVM, no JMX setup required.
+  of the target JVM, no JMX setup required. Also ships a standalone
+  companion, heap-dump-on-oom.sh, for catching an actual
+  OutOfMemoryError — jfr view can't see that event at all.
 license: MIT
 compatibility: "Requires SDKMAN (https://sdkman.io) installed — loads its own JDK 21+ toolchain from this skill's .sdkmanrc for jfr view; the target app doesn't need JDK 21+, only this tool does."
 metadata:
@@ -45,14 +47,15 @@ instead of erroring if one exists.
 
 Env overrides:
 - `JFR_VIEWS` — comma-separated `jfr view` names per cycle. Default
-  `hot-methods,gc` (CPU hot loop + GC pressure).
+  `hot-methods,gc` (CPU hot loop + GC pressure). Other views worth trying:
+  `gc-pauses` (a statistical summary — total/count/min/median/avg/P90 pause
+  time — instead of a long per-GC table) and `memory-leaks-by-class`
+  (samples of objects that have survived a while; see the OOM section below
+  for what it can and can't tell you).
 - `JFR_MAXSIZE` — disk cap for the rolling recording. Default `200m`.
-- `HEAP_DUMP_ON_OOM` — set `true` to also enable
-  `HeapDumpOnOutOfMemoryError` on the target for the run (reverted on exit).
-  Default `false` — opt-in, not automatic. See Rules below for why.
-- `HEAP_DUMP_PATH` — where that dump goes if enabled. Default
-  `$TMPDIR/jfr-live-monitor-heap-<pid>-<timestamp>.hprof`. Skipped entirely
-  (this run leaves it alone) if the target already has the flag set.
+
+This script is purely `jfr view`-based and doesn't touch any JVM flags —
+for catching an actual `OutOfMemoryError`, see `heap-dump-on-oom.sh` below.
 
 ## Running it as an agent
 
@@ -101,18 +104,46 @@ sampling are on.
   (`docker exec`/`kubectl exec`), not from the host.
 - Don't drop `interval_seconds` below a few seconds — each cycle is a real
   `JFR.dump`, and there's no extra signal from polling faster.
-- `jdk.JavaErrorThrow` (the event `jfr view`/`print` would otherwise use to
-  catch a thrown error) explicitly ignores `OutOfMemoryError` — it's not a
-  views bug, the JDK's own event metadata says so. Neither `hot-methods` nor
-  `gc` will ever show an OOM happening; `gc`'s heap-before/after pattern is
-  the closest indirect signal.
-- Don't turn on `HEAP_DUMP_ON_OOM=true` casually on a production box without
-  thinking about where it writes: dump size tracks `-Xmx`, not how much
-  actually leaked (a 100MB heap produced a 117MB dump in testing here; a
-  default ~1.9GB heap produced 2.75GB) — and if `$TMPDIR` is tmpfs (common in
-  containers), that write competes with the app for the same RAM right when
-  it's already under memory pressure. Point `HEAP_DUMP_PATH` at real disk
-  with headroom for `-Xmx` worth of space before enabling it.
+
+## Catching an actual OutOfMemoryError
+
+`jdk.JavaErrorThrow` — the event `jfr view`/`print` would otherwise use to
+catch a thrown error — explicitly ignores `OutOfMemoryError` (the JDK's own
+event metadata says so: *"OutOfMemoryErrors are ignored"*). Not a views bug;
+the event genuinely isn't there. Neither `hot-methods` nor `gc` will ever
+show an OOM happening.
+
+`memory-leaks-by-class`/`memory-leaks-by-site` (backed by
+`jdk.OldObjectSample`) looked like it might substitute, since it samples
+objects that survive a while. Tested against this repo's actual OOM bug
+(`resource-exhaustion-demo`, `MemoryHogService.buildReport`) and it doesn't:
+across two runs (21 and lower sample counts) **zero** samples named the
+actual culprit class or call site — every one was Tomcat/framework noise
+(`Http11OutputBuffer`, `ConcurrentHashMap` internals, class loading), and
+every sample's `root` field (the reference-chain-to-GC-root info) came back
+`N/A`. Reservoir sampling just doesn't get a fair chance against a fast
+crash — it might do better for a genuinely slow leak (hours, not seconds),
+but don't rely on it for the crash case.
+
+**What does work**: `heap-dump-on-oom.sh <pid> [path]` in this same
+directory — a standalone script, no JFR/JDK 21+/SDKMAN needed, just `jcmd`.
+Enables `HeapDumpOnOutOfMemoryError` live via `jcmd`'s `{manageable}` flags
+(no restart), so the *next* OOM on that pid writes a real `.hprof` you can
+open in Eclipse MAT or JMC and see the actual retained object graph. Turn it
+off again with `heap-dump-on-oom.sh <pid> --off`.
+
+```bash
+./heap-dump-on-oom.sh 12345 /var/diagnostics/heap.hprof   # enable
+./heap-dump-on-oom.sh 12345 --off                          # disable
+```
+
+Not automatic, not bundled into `jfr-monitor.sh` — a heap dump is roughly
+the size of `-Xmx` (100MB heap → 117MB dump, ~1.9GB heap → 2.75GB dump, both
+measured against this repo's demo), and if the target's `$TMPDIR` is tmpfs
+(common in containers) that write competes with the app for the same RAM
+right when it's already under pressure. Point it at real disk with headroom
+before enabling, and think about whether you want this running before you
+turn it on.
 
 ## Troubleshooting
 
@@ -124,3 +155,7 @@ sampling are on.
 - `AttachNotSupportedException` — target isn't a JVM (check `jcmd <pid>
   VM.version` works alone first).
 - `(no data for '<view>' yet)` — normal for the first cycle or two.
+- `heap-dump-on-oom.sh`: `couldn't set the flags on pid ...` — check they're
+  actually `{manageable}` on that JVM (`jcmd <pid> VM.flags -all | grep
+  HeapDump`); if not, it has to go on the JVM's own startup command line
+  instead (`-XX:+HeapDumpOnOutOfMemoryError -XX:HeapDumpPath=...`).
