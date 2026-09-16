@@ -47,6 +47,12 @@ Env overrides:
 - `JFR_VIEWS` — comma-separated `jfr view` names per cycle. Default
   `hot-methods,gc` (CPU hot loop + GC pressure).
 - `JFR_MAXSIZE` — disk cap for the rolling recording. Default `200m`.
+- `HEAP_DUMP_ON_OOM` — set `true` to also enable
+  `HeapDumpOnOutOfMemoryError` on the target for the run (reverted on exit).
+  Default `false` — opt-in, not automatic. See Rules below for why.
+- `HEAP_DUMP_PATH` — where that dump goes if enabled. Default
+  `$TMPDIR/jfr-live-monitor-heap-<pid>-<timestamp>.hprof`. Skipped entirely
+  (this run leaves it alone) if the target already has the flag set.
 
 ## Running it as an agent
 
@@ -95,6 +101,18 @@ sampling are on.
   (`docker exec`/`kubectl exec`), not from the host.
 - Don't drop `interval_seconds` below a few seconds — each cycle is a real
   `JFR.dump`, and there's no extra signal from polling faster.
+- `jdk.JavaErrorThrow` (the event `jfr view`/`print` would otherwise use to
+  catch a thrown error) explicitly ignores `OutOfMemoryError` — it's not a
+  views bug, the JDK's own event metadata says so. Neither `hot-methods` nor
+  `gc` will ever show an OOM happening; `gc`'s heap-before/after pattern is
+  the closest indirect signal.
+- Don't turn on `HEAP_DUMP_ON_OOM=true` casually on a production box without
+  thinking about where it writes: dump size tracks `-Xmx`, not how much
+  actually leaked (a 100MB heap produced a 117MB dump in testing here; a
+  default ~1.9GB heap produced 2.75GB) — and if `$TMPDIR` is tmpfs (common in
+  containers), that write competes with the app for the same RAM right when
+  it's already under memory pressure. Point `HEAP_DUMP_PATH` at real disk
+  with headroom for `-Xmx` worth of space before enabling it.
 
 ## Troubleshooting
 

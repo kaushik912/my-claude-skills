@@ -10,7 +10,7 @@ WINDOW="${3:-60}"
 usage() {
     echo "Usage: $0 <pid> [interval_seconds=30] [window_seconds=60]" >&2
     echo "  env overrides: JFR_VIEWS (comma-separated), JFR_MAXSIZE," >&2
-    echo "                 HEAP_DUMP_ON_OOM (default true), HEAP_DUMP_PATH" >&2
+    echo "                 HEAP_DUMP_ON_OOM (default false), HEAP_DUMP_PATH" >&2
     exit 1
 }
 
@@ -63,7 +63,7 @@ echo "Loaded JDK via SDKMAN (.sdkmanrc): $JFR_BIN"
 
 JFR_VIEWS="${JFR_VIEWS:-hot-methods,gc}"
 JFR_MAXSIZE="${JFR_MAXSIZE:-200m}"
-HEAP_DUMP_ON_OOM="${HEAP_DUMP_ON_OOM:-true}"
+HEAP_DUMP_ON_OOM="${HEAP_DUMP_ON_OOM:-false}"
 RECORDING_NAME="jfr-live-monitor"
 DUMP_FILE="$(mktemp -t jfr-live-monitor-XXXXXX.jfr)"
 STARTED_RECORDING=0
@@ -89,8 +89,13 @@ trap cleanup EXIT INT TERM
 # jdk.JavaErrorThrow explicitly ignores OutOfMemoryError (per the JDK's own
 # event metadata) — jfr view/print never sees it. HeapDumpOnOutOfMemoryError
 # is the reliable way to catch it, and it's a {manageable} flag, so it can be
-# toggled on a JVM that's already running, no restart needed. Skip entirely
-# if the target already has it configured — don't clobber someone else's path.
+# toggled on a JVM that's already running, no restart needed. Opt-in
+# (default false): a heap dump is roughly the size of -Xmx (we've seen
+# 100MB-heap -> 117MB dump, ~1.9GB-heap -> 2.75GB dump), and if $TMPDIR is
+# tmpfs (common in containers) that write competes with the app for the same
+# RAM right when it's already under pressure — the wrong default for a
+# monitoring tool to impose silently on a prod box. Skip entirely if the
+# target already has it configured — don't clobber someone else's path.
 if [ "$HEAP_DUMP_ON_OOM" = "true" ]; then
     VM_FLAGS_OUTPUT="$("$JCMD_BIN" "$PID" VM.flags -all 2>&1 || true)"
     CURRENT_HDOOME="$(printf '%s' "$VM_FLAGS_OUTPUT" | grep -oE 'HeapDumpOnOutOfMemoryError *= *(true|false)' | grep -oE 'true|false' || true)"
