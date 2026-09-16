@@ -86,6 +86,8 @@ real memory-pressure signal, not just churn — say so. Watch `Longest Pause`
 for a climbing trend alongside growing heap size — that combination is worse
 than either alone. `No events found` for a cycle is normal (nothing
 GC-worthy happened in that window), not an error — don't flag it as one.
+(`Longest Pause` already *is* the raw `jdk.GCPhasePause` duration for that
+GC — no need to also `jfr print --events jdk.GCPhasePause`, same number.)
 
 If both signals are strong in the same run, call out that the process may be
 both CPU- and memory-bound rather than picking one.
@@ -126,6 +128,15 @@ every sample's `root` field (the reference-chain-to-GC-root info) came back
 `N/A`. Reservoir sampling just doesn't get a fair chance against a fast
 crash — it might do better for a genuinely slow leak (hours, not seconds),
 but don't rely on it for the crash case.
+
+Also tried `jcmd <pid> JFR.dump ... path-to-gc-roots=true` (a one-off dump
+option, not something for `jfr-monitor.sh`'s routine poll loop — the JDK
+docs say it "creates overhead similar to a full garbage collection"). It
+does populate `root` for *some* samples (previously always `N/A`) with real
+thread/class-loader reference chains — but `MemoryHogService` still never
+showed up, and the actual request thread's objects stayed `N/A` too. It adds
+depth to whatever gets sampled, not a fair shot at catching the actual
+culprit in a fast crash. Same conclusion holds.
 
 **What does work**: `heap-dump-on-oom.sh <pid> [path]` in this same
 directory — a standalone script, no JFR or JDK 21+ needed, just `jcmd`.
