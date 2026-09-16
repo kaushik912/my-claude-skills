@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Enable (or disable) HeapDumpOnOutOfMemoryError on a running JVM, live, via
 # jcmd's {manageable} flags -- no restart needed. Standalone: doesn't need
-# JFR, JDK 21+, or SDKMAN, just jcmd on PATH.
+# JFR or JDK 21+, just jcmd on PATH.
 #
 # Usage: ./heap-dump-on-oom.sh <pid> [heap_dump_path]
 #        ./heap-dump-on-oom.sh <pid> --off

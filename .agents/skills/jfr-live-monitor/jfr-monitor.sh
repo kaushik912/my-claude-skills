@@ -1,5 +1,8 @@
 #!/usr/bin/env bash
 # Poll a running JVM's hot methods / GC behavior via a rolling JFR recording.
+# Requires JDK 21+ on PATH (jfr view was added in 21) -- point JFR_BIN/
+# JCMD_BIN at one if PATH's jfr/jcmd is older. Not this script's job to
+# install or manage a JDK for you.
 # Usage: ./jfr-monitor.sh <pid> [interval_seconds] [window_seconds]
 set -euo pipefail
 
@@ -9,7 +12,8 @@ WINDOW="${3:-60}"
 
 usage() {
     echo "Usage: $0 <pid> [interval_seconds=30] [window_seconds=60]" >&2
-    echo "  env overrides: JFR_VIEWS (comma-separated), JFR_MAXSIZE" >&2
+    echo "  env overrides: JFR_BIN, JCMD_BIN, JFR_VIEWS (comma-separated), JFR_MAXSIZE" >&2
+    echo "  requires JDK 21+ (jfr view) -- see error below if PATH's isn't." >&2
     echo "  companion: heap-dump-on-oom.sh in this same directory catches an" >&2
     echo "  actual OutOfMemoryError — jfr view can't (see SKILL.md)." >&2
     exit 1
@@ -25,42 +29,23 @@ if ! kill -0 "$PID" 2>/dev/null; then
     exit 1
 fi
 
-# Load the JDK 21+ toolchain pinned in this skill's .sdkmanrc via SDKMAN —
-# required, no manual override. `jfr view` needs JDK 21+; the target app
-# doesn't have to run on it, only this analysis tool does.
-SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-SDKMAN_INIT="${SDKMAN_DIR:-$HOME/.sdkman}/bin/sdkman-init.sh"
+JFR_BIN="${JFR_BIN:-jfr}"
+JCMD_BIN="${JCMD_BIN:-jcmd}"
 
-if [ ! -f "$SDKMAN_INIT" ]; then
-    echo "ERROR: SDKMAN not found (looked for $SDKMAN_INIT)." >&2
-    echo "This skill loads its JDK 21+ toolchain (for 'jfr view') from .sdkmanrc via SDKMAN." >&2
-    echo "Install it:" >&2
-    echo "  curl -s \"https://get.sdkman.io\" | bash" >&2
-    echo "then open a new shell and re-run." >&2
+if ! command -v "$JFR_BIN" >/dev/null 2>&1; then
+    echo "ERROR: '$JFR_BIN' not found on PATH." >&2
+    echo "This script needs the jfr tool from JDK 21+ (jfr view was added in 21)." >&2
+    echo "Install a JDK 21+ and put it on PATH, or set JFR_BIN=/path/to/jdk21/bin/jfr." >&2
     exit 1
 fi
 
-set +euo pipefail
-# shellcheck disable=SC1090
-source "$SDKMAN_INIT" >/dev/null 2>&1
-ORIG_DIR="$PWD"
-cd "$SCRIPT_DIR"
-sdk env >/dev/null 2>&1
-cd "$ORIG_DIR"
-set -euo pipefail
-
-# `sdk env` sets JAVA_HOME to the pinned candidate, but a system jfr earlier
-# in PATH (e.g. from /etc/profile.d or .bashrc) can still win a plain
-# `command -v jfr` lookup — go straight at JAVA_HOME instead.
-if [ -z "${JAVA_HOME:-}" ] || [ ! -x "${JAVA_HOME}/bin/jfr" ]; then
-    echo "ERROR: SDKMAN didn't resolve a usable JDK from .sdkmanrc (JAVA_HOME=${JAVA_HOME:-unset})." >&2
-    echo "Run 'sdk env install' in $SCRIPT_DIR to install the pinned candidate, then retry." >&2
+JFR_VIEW_HELP="$("$JFR_BIN" view 2>&1 || true)"
+if printf '%s' "$JFR_VIEW_HELP" | grep -qi "unknown command"; then
+    echo "ERROR: '$JFR_BIN' doesn't support 'jfr view' -- needs JDK 21+." >&2
+    echo "Detected: $("$JFR_BIN" --version 2>&1 | head -1)" >&2
+    echo "Install a JDK 21+ and put it on PATH, or set JFR_BIN=/path/to/jdk21/bin/jfr." >&2
     exit 1
 fi
-
-JFR_BIN="${JAVA_HOME}/bin/jfr"
-JCMD_BIN="${JAVA_HOME}/bin/jcmd"
-echo "Loaded JDK via SDKMAN (.sdkmanrc): $JFR_BIN"
 
 JFR_VIEWS="${JFR_VIEWS:-hot-methods,gc}"
 JFR_MAXSIZE="${JFR_MAXSIZE:-200m}"
@@ -68,8 +53,6 @@ RECORDING_NAME="jfr-live-monitor"
 DUMP_FILE="$(mktemp -t jfr-live-monitor-XXXXXX.jfr)"
 STARTED_RECORDING=0
 
-# Registered immediately after DUMP_FILE exists so every exit path from here
-# on (including the validation checks right below) cleans it up.
 cleanup() {
     if [ "$STARTED_RECORDING" -eq 1 ]; then
         "$JCMD_BIN" "$PID" JFR.stop name="$RECORDING_NAME" >/dev/null 2>&1 || true
@@ -77,13 +60,6 @@ cleanup() {
     rm -f "$DUMP_FILE"
 }
 trap cleanup EXIT INT TERM
-
-JFR_VIEW_HELP="$("$JFR_BIN" view 2>&1 || true)"
-if printf '%s' "$JFR_VIEW_HELP" | grep -qi "unknown command"; then
-    echo "ERROR: '$JFR_BIN' (from SDKMAN's .sdkmanrc candidate) doesn't support 'jfr view'." \
-         "The pinned candidate needs to be JDK 21+ — check .sdkmanrc in $SCRIPT_DIR." >&2
-    exit 1
-fi
 
 JFR_CHECK_OUTPUT="$("$JCMD_BIN" "$PID" JFR.check 2>&1 || true)"
 if printf '%s' "$JFR_CHECK_OUTPUT" | grep -q "$RECORDING_NAME"; then

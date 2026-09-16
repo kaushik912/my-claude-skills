@@ -10,7 +10,7 @@ description: >-
   companion, heap-dump-on-oom.sh, for catching an actual
   OutOfMemoryError — jfr view can't see that event at all.
 license: MIT
-compatibility: "Requires SDKMAN (https://sdkman.io) installed — loads its own JDK 21+ toolchain from this skill's .sdkmanrc for jfr view; the target app doesn't need JDK 21+, only this tool does."
+compatibility: "Requires JDK 21+ on PATH for jfr view (added in 21) — bring your own JDK; point JFR_BIN/JCMD_BIN at one if PATH's isn't 21+. The target app doesn't need JDK 21+, only this tool does."
 metadata:
   author: kaushik912
   version: "1.0.0"
@@ -27,11 +27,11 @@ trailing window and renders it with `jfr view` (`hot-methods`, `gc`, etc).
 Each cycle shows *recent* activity only, not a lifetime average, so a hot
 method or GC spike shows up as it happens.
 
-JDK 21+ is required for `jfr view` — loaded automatically via SDKMAN from
-this skill's `.sdkmanrc`, unconditionally, no env var to override it. If
-SDKMAN isn't installed the script exits with install instructions instead of
-falling through to whatever `jfr` is on `PATH`. To change the JDK version,
-edit `.sdkmanrc` directly.
+JDK 21+ is required for `jfr view` (added in 21) — bring your own. The
+script checks `jfr` on `PATH` and exits with a clear error naming the
+detected version if it's too old; point `JFR_BIN`/`JCMD_BIN` at a 21+
+install if PATH's isn't one. No JDK management here on purpose — this script
+does one thing (JFR analysis), not JDK installation.
 
 ## Usage
 
@@ -46,6 +46,8 @@ file). Reuses an already-running `jfr-live-monitor` recording on that pid
 instead of erroring if one exists.
 
 Env overrides:
+- `JFR_BIN` / `JCMD_BIN` — path to `jfr`/`jcmd`, if the ones on `PATH`
+  aren't JDK 21+ (or aren't on `PATH` at all).
 - `JFR_VIEWS` — comma-separated `jfr view` names per cycle. Default
   `hot-methods,gc` (CPU hot loop + GC pressure). Other views worth trying:
   `gc-pauses` (a statistical summary — total/count/min/median/avg/P90 pause
@@ -126,7 +128,7 @@ crash — it might do better for a genuinely slow leak (hours, not seconds),
 but don't rely on it for the crash case.
 
 **What does work**: `heap-dump-on-oom.sh <pid> [path]` in this same
-directory — a standalone script, no JFR/JDK 21+/SDKMAN needed, just `jcmd`.
+directory — a standalone script, no JFR or JDK 21+ needed, just `jcmd`.
 Enables `HeapDumpOnOutOfMemoryError` live via `jcmd`'s `{manageable}` flags
 (no restart), so the *next* OOM on that pid writes a real `.hprof` you can
 open in Eclipse MAT or JMC and see the actual retained object graph. Turn it
@@ -147,10 +149,9 @@ turn it on.
 
 ## Troubleshooting
 
-- `SDKMAN not found` — install it, open a new shell, re-run.
-- `SDKMAN didn't resolve a usable JDK` — candidate pinned in `.sdkmanrc`
-  isn't installed; run `sdk env install` in the skill directory.
-- `doesn't support 'jfr view'` — `.sdkmanrc` is pinned to a pre-21 Java.
+- `'jfr' not found on PATH` / `doesn't support 'jfr view'` — no JDK 21+
+  available. Install one and put it on `PATH`, or set
+  `JFR_BIN=/path/to/jdk21/bin/jfr` (and `JCMD_BIN` alongside it).
 - `no process with pid ...` — wrong pid, or a different container/namespace.
 - `AttachNotSupportedException` — target isn't a JVM (check `jcmd <pid>
   VM.version` works alone first).
