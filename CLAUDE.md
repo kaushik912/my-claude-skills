@@ -4,8 +4,6 @@ While writing new skill, usually put in my custom skills folder as it is git-con
 
 Always use a venv when running/installing for Python scripts. Never use --break-system-packages or user-wide pip installs.
 
-For existing or new projects, check if any of my own agents or skills would fit — refer to `agent-porter` for agents, or `npx skills add kaushik912/my-claude-skills` for skills — and remind me to install if missing.
-
 If a task requires Docker, stop and ask me first — I keep Docker off by default since it slows my PC.
 
 For OpenRouter, always use `deepseek/deepseek-v4-flash-latest` in spring-ai projects or any AI project needing an API key.
